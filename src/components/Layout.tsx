@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
+import { useState } from "react";
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -7,9 +8,16 @@ import {
   CreditCard, 
   Plug, 
   TrendingUp,
-  BarChart3 
+  BarChart3,
+  Moon,
+  Sun,
+  Menu,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -21,65 +29,124 @@ const navigation = [
   { name: "KPIs", href: "/kpis", icon: BarChart3 },
 ];
 
-export default function Layout() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Logo */}
+      <div className="flex h-16 md:h-20 items-center justify-between border-b border-border/50 px-4 md:px-6">
+        <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground">
+          Lux<span className="text-accent">Clinic</span>
+        </h1>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          className="h-9 w-9 shrink-0"
+        >
+          {theme === "light" ? (
+            <Moon className="h-4 w-4" />
+          ) : (
+            <Sun className="h-4 w-4" />
+          )}
+          <span className="sr-only">Alternar tema</span>
+        </Button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1 px-3 md:px-4 py-6 md:py-8 overflow-y-auto">
+        {navigation.map((item) => {
+          const isActive = location.pathname === item.href;
+          return (
+            <NavLink
+              key={item.name}
+              to={item.href}
+              onClick={onNavigate}
+              className={cn(
+                "group flex items-center gap-3 rounded-lg px-3 md:px-4 py-2.5 md:py-3 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-accent/10 text-accent"
+                  : "text-foreground/70 hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <item.icon
+                className={cn(
+                  "h-5 w-5 shrink-0 transition-all duration-200",
+                  isActive ? "text-accent" : "text-foreground/50 group-hover:text-foreground"
+                )}
+              />
+              <span className="truncate">{item.name}</span>
+            </NavLink>
+          );
+        })}
+      </nav>
+
+      {/* User Profile */}
+      <div className="border-t border-border/50 p-3 md:p-4">
+        <div className="flex items-center gap-3 rounded-lg bg-secondary/50 px-3 md:px-4 py-2.5 md:py-3">
+          <div className="flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full bg-accent/20">
+            <span className="font-display text-xs md:text-sm font-semibold text-accent">DS</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">Dr. Silva</p>
+            <p className="text-xs text-muted-foreground truncate">Premium Plan</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Layout() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border/50 bg-card">
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex h-20 items-center border-b border-border/50 px-8">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">
-              Lux<span className="text-accent">Clinic</span>
-            </h1>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 px-4 py-8">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "group flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200",
-                    isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-foreground/70 hover:bg-secondary hover:text-foreground"
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      "h-5 w-5 transition-all duration-200",
-                      isActive ? "text-accent" : "text-foreground/50 group-hover:text-foreground"
-                    )}
-                  />
-                  <span>{item.name}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-
-          {/* User Profile */}
-          <div className="border-t border-border/50 p-4">
-            <div className="flex items-center gap-3 rounded-lg bg-secondary/50 px-4 py-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/20">
-                <span className="font-display text-sm font-semibold text-accent">DS</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">Dr. Silva</p>
-                <p className="text-xs text-muted-foreground">Premium Plan</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:fixed lg:left-0 lg:top-0 lg:z-40 lg:flex lg:h-screen lg:w-64 lg:border-r lg:border-border/50 lg:bg-card">
+        <SidebarContent />
       </aside>
 
+      {/* Mobile Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-b border-border/50 bg-card/95 backdrop-blur-sm px-4 lg:hidden">
+        <h1 className="font-display text-xl font-bold tracking-tight text-foreground">
+          Lux<span className="text-accent">Clinic</span>
+        </h1>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-9 w-9"
+          >
+            {theme === "light" ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
+            <span className="sr-only">Alternar tema</span>
+          </Button>
+
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Abrir menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[280px] p-0">
+              <SidebarContent onNavigate={() => setMobileMenuOpen(false)} />
+            </SheetContent>
+          </Sheet>
+        </div>
+      </header>
+
       {/* Main Content */}
-      <main className="ml-64 flex-1">
+      <main className="w-full lg:ml-64 pt-16 lg:pt-0">
         <div className="min-h-screen">
           <Outlet />
         </div>

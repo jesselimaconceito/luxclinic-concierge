@@ -1,73 +1,158 @@
-# Welcome to your Lovable project
+# LuxClinic - Premium Clinic Dashboard
 
-## Project info
+Dashboard elegante e moderno para gestão de clínicas de saúde, 100% otimizado para dispositivos móveis e desktop.
 
-**URL**: https://lovable.dev/projects/a5d8c5c7-f581-4b7f-8a90-9d5fe52515ce
+## ✨ Funcionalidades
 
-## How can I edit this code?
+### 🎨 Tema Claro/Escuro
+- Alternância entre tema claro e escuro
+- Preferência salva no localStorage
+- Ícone de toggle no cabeçalho da sidebar
+- Cores elegantes e premium em ambos os temas
 
-There are several ways of editing your application.
+### 📱 100% Responsivo
+- **Mobile-First Design**: Interface otimizada para dispositivos móveis
+- **Desktop Otimizado**: Layout com sidebar fixa para telas grandes
+- **Menu Hamburger**: Navegação em slide-out para mobile
+- **Touch Optimized**: Interações otimizadas para toque
+- **Breakpoints**: 
+  - Mobile: < 640px
+  - Tablet: 640px - 1024px
+  - Desktop: > 1024px
 
-**Use Lovable**
+### 📊 Dashboard
+- KPIs principais com animações
+- Agenda do dia
+- Ações rápidas
+- Cards responsivos e interativos
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a5d8c5c7-f581-4b7f-8a90-9d5fe52515ce) and start prompting.
+### 📅 Agenda
+- Calendário mensal interativo
+- Visualizações: Dia, Semana, Mês
+- Lista de próximos compromissos
+- Indicadores visuais de status
 
-Changes made via Lovable will be committed automatically to this repo.
+### 👥 CRM
+- Gestão de pacientes
+- Busca inteligente
+- Cards informativos com detalhes de contato
+- Status de atividade
 
-**Use your preferred IDE**
+### 💳 Assinaturas
+- Três planos disponíveis
+- Comparação visual de recursos
+- Indicador de plano atual
+- Design responsivo de cards
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🔌 Integrações
+- WhatsApp (Oficial e Não-oficial)
+- OpenAI
+- Webhooks customizados
+- Toggle de ativação
+- Badges de status
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🚀 Tecnologias
 
-Follow these steps:
+- **React 18** - Framework principal
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Estilização responsiva
+- **Vite** - Build tool
+- **React Router** - Navegação
+- **Radix UI** - Componentes acessíveis
+- **Lucide React** - Ícones modernos
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 💻 Como Executar
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+# Instalar dependências
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Executar em desenvolvimento
 npm run dev
+
+# Build para produção
+npm run build
+
+# Preview do build
+npm run preview
 ```
 
-**Edit a file directly in GitHub**
+## 📱 Otimizações Mobile
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### CSS
+- `-webkit-tap-highlight-color: transparent` - Remove highlight em toque
+- `touch-action: manipulation` - Melhora performance de toque
+- `overflow-x: hidden` - Previne scroll horizontal
+- Safe area insets para devices com notch
+- Hover states apenas para dispositivos com hover
 
-**Use GitHub Codespaces**
+### HTML
+- Meta tags viewport otimizadas
+- Support para PWA
+- Theme color adaptativo
+- Apple-specific meta tags
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Layout
+- Header fixo no mobile com 64px de altura
+- Sidebar transformada em menu lateral
+- Padding e margins adaptivos
+- Tipografia escalável (rem/em)
+- Elementos de toque com mínimo 44px
 
-## What technologies are used for this project?
+## 🎨 Sistema de Cores
 
-This project is built with:
+### Tema Claro
+- Background: Bege claro elegante
+- Foreground: Azul escuro profundo
+- Accent: Dourado premium
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Tema Escuro
+- Background: Azul escuro profundo
+- Foreground: Bege claro
+- Accent: Dourado brilhante
 
-## How can I deploy this project?
+## 📂 Estrutura do Projeto
 
-Simply open [Lovable](https://lovable.dev/projects/a5d8c5c7-f581-4b7f-8a90-9d5fe52515ce) and click on Share -> Publish.
+```
+src/
+├── components/
+│   ├── ui/           # Componentes Radix UI
+│   ├── Layout.tsx    # Layout principal responsivo
+│   ├── NavLink.tsx   # Links de navegação
+│   └── KPICard.tsx   # Cards de métricas
+├── contexts/
+│   └── ThemeContext.tsx  # Contexto de tema
+├── pages/
+│   ├── Dashboard.tsx
+│   ├── Agenda.tsx
+│   ├── CRM.tsx
+│   ├── Subscription.tsx
+│   ├── Integrations.tsx
+│   └── NotFound.tsx
+├── lib/
+│   └── utils.ts      # Utilitários
+├── App.tsx
+├── main.tsx
+└── index.css         # Estilos globais
 
-## Can I connect a custom domain to my Lovable project?
+```
 
-Yes, you can!
+## 🔧 Configuração
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+O projeto está configurado com:
+- ESLint para linting
+- TypeScript strict mode
+- Path aliases (@/)
+- Tailwind CSS com plugins de animação
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 📄 Licença
+
+Este projeto é privado e proprietário.
+
+## 👨‍💻 Desenvolvido por
+
+LuxClinic Team
+
+---
+
+**Nota**: Este projeto foi otimizado para oferecer a melhor experiência possível tanto em dispositivos móveis quanto em desktops, com atenção especial a performance, acessibilidade e design premium.

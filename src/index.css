@@ -56,6 +56,50 @@ All colors MUST be HSL.
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-spring: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
+
+  .dark {
+    /* LuxClinic Premium Dark Color System */
+    --background: 228 26% 8%;
+    --foreground: 40 17% 96%;
+
+    --card: 228 26% 12%;
+    --card-foreground: 40 17% 96%;
+
+    --popover: 228 26% 10%;
+    --popover-foreground: 40 17% 96%;
+
+    --primary: 40 17% 96%;
+    --primary-foreground: 228 26% 14%;
+
+    --secondary: 228 20% 16%;
+    --secondary-foreground: 40 17% 96%;
+
+    --muted: 228 15% 20%;
+    --muted-foreground: 40 10% 65%;
+
+    --accent: 45 65% 58%;
+    --accent-foreground: 228 26% 10%;
+
+    --success: 158 39% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 3 47% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 228 20% 20%;
+    --input: 228 20% 20%;
+    --ring: 45 65% 58%;
+
+    /* Premium Dark Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(228 26% 12%), hsl(228 26% 16%));
+    --gradient-accent: linear-gradient(135deg, hsl(45 65% 58%), hsl(45 65% 65%));
+    --gradient-subtle: linear-gradient(180deg, hsl(228 26% 8%), hsl(228 20% 10%));
+
+    /* Elegant Dark Shadows */
+    --shadow-elegant: 0 10px 40px -10px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 40px hsl(45 65% 58% / 0.3);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.3);
+  }
 }
 
 @layer base {
@@ -63,12 +107,19 @@ All colors MUST be HSL.
 
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground font-body antialiased;
     font-size: 16px;
     line-height: 1.6;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -90,6 +141,19 @@ All colors MUST be HSL.
   h4 {
     @apply text-xl md:text-2xl font-semibold;
   }
+
+  /* Melhorias para touch devices */
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Smooth scrolling */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
 }
 
 @layer utilities {
@@ -98,15 +162,47 @@ All colors MUST be HSL.
   }
 
   .hover-scale {
-    @apply transition-transform duration-200 hover:scale-105;
+    @apply transition-transform duration-200 active:scale-95;
+  }
+  
+  @media (hover: hover) {
+    .hover-scale:hover {
+      transform: scale(1.05);
+    }
   }
 
   .hover-glow {
-    @apply transition-shadow duration-300 hover:shadow-[0_0_40px_hsl(var(--accent)/0.3)];
+    @apply transition-shadow duration-300;
+  }
+
+  @media (hover: hover) {
+    .hover-glow:hover {
+      box-shadow: 0 0 40px hsl(var(--accent)/0.3);
+    }
   }
 
   .card-luxury {
     @apply bg-card rounded-xl shadow-[0_4px_20px_hsl(var(--primary)/0.08)] border border-border/50;
-    @apply transition-all duration-300 hover:shadow-[0_10px_40px_hsl(var(--primary)/0.15)];
+    @apply transition-all duration-300;
+  }
+
+  @media (hover: hover) {
+    .card-luxury:hover {
+      box-shadow: 0 10px 40px hsl(var(--primary)/0.15);
+    }
+  }
+
+  /* Otimizações para mobile */
+  .mobile-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .mobile-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-safe-top {
+    padding-top: env(safe-area-inset-top);
   }
 }
