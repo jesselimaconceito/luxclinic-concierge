@@ -1,45 +1,130 @@
-import { useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Calendar, ChevronLeft, ChevronRight, Clock, User, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useAppointments, useCreateAppointment } from "@/hooks/useAppointments";
+import { usePatients } from "@/hooks/usePatients";
+import { toast } from "sonner";
+import { toSaoPauloISO } from "@/lib/dateUtils";
+import { useQueryClient } from "@tanstack/react-query";
 
 type ViewMode = "day" | "week" | "month";
-
-interface Appointment {
-  id: number;
-  date: Date;
-  time: string;
-  patient: string;
-  type: string;
-  status: "confirmed" | "pending" | "completed";
-}
-
-// Dados de exemplo
-const mockAppointments: Appointment[] = [
-  { id: 1, date: new Date(2024, 10, 15, 9, 0), time: "09:00", patient: "Maria Santos", type: "Consulta", status: "confirmed" },
-  { id: 2, date: new Date(2024, 10, 15, 14, 0), time: "14:00", patient: "Ana Costa", type: "Tratamento", status: "confirmed" },
-  { id: 3, date: new Date(2024, 10, 16, 10, 30), time: "10:30", patient: "João Silva", type: "Retorno", status: "confirmed" },
-  { id: 4, date: new Date(2024, 10, 16, 15, 0), time: "15:00", patient: "Pedro Oliveira", type: "Consulta", status: "pending" },
-  { id: 5, date: new Date(2024, 10, 18, 11, 0), time: "11:00", patient: "Rita Mendes", type: "Avaliação", status: "confirmed" },
-  { id: 6, date: new Date(2024, 10, 18, 16, 30), time: "16:30", patient: "Carlos Lima", type: "Tratamento", status: "confirmed" },
-  { id: 7, date: new Date(2024, 10, 22, 9, 30), time: "09:30", patient: "Luisa Fernandes", type: "Consulta", status: "confirmed" },
-  { id: 8, date: new Date(2024, 10, 22, 14, 30), time: "14:30", patient: "Marco Paulo", type: "Retorno", status: "pending" },
-  { id: 9, date: new Date(2024, 10, 25, 10, 0), time: "10:00", patient: "Sofia Rodrigues", type: "Tratamento", status: "confirmed" },
-];
 
 export default function Agenda() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    start_date: "",
+    start_time: "",
+    end_date: "",
+    end_time: "",
+    patient_id: "",
+    patient_name: "",
+    type: "",
+    status: "pending" as "confirmed" | "pending" | "completed",
+    observations: ""
+  });
+
+  // Buscar compromissos e pacientes
+  const { data: allAppointments = [], isLoading, refetch } = useAppointments();
+  const { data: patients = [] } = usePatients();
+  const createAppointment = useCreateAppointment();
+  const queryClient = useQueryClient();
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  // Função para sincronizar agenda com webhook
+  const syncAgendaWithWebhook = async () => {
+    try {
+      console.log('🔄 Iniciando sincronização com webhook...');
+      
+      // Formatar eventos para enviar ao webhook
+      const eventsToSync = allAppointments.map(apt => {
+        const patient = patients.find(p => p.id === apt.patient_id);
+        
+        // Usar start_datetime/end_datetime se disponível, senão criar a partir de date/time
+        const startDateTime = apt.start_datetime || `${apt.date}T${apt.time}:00-03:00`;
+        const endDateTime = apt.end_datetime || `${apt.date}T${apt.time}:00-03:00`;
+        
+        return {
+          id: apt.id,
+          start_datetime: startDateTime,
+          end_datetime: endDateTime,
+          patient_name: apt.patient_name,
+          patient_email: patient?.email || '',
+          type: apt.type,
+          status: apt.status,
+          observations: apt.observations || apt.notes || ''
+        };
+      });
+
+      console.log(`📤 Enviando ${eventsToSync.length} eventos para conferência...`);
+
+      // Enviar para webhook de conferência
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/labz-conferir-agenda', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          events: eventsToSync,
+          total: eventsToSync.length,
+          synced_at: new Date().toISOString()
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Sincronização concluída:', result);
+        return result;
+      } else {
+        console.warn('⚠️ Erro na sincronização:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao sincronizar agenda:', error);
+    }
+  };
+
+  // Função para atualizar dados
+  const handleRefresh = async () => {
+    toast.loading("Atualizando agenda...", { id: "refresh" });
+    try {
+      // 1. Recarregar dados do banco
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: ['patients'] })
+      ]);
+      
+      // 2. Sincronizar com webhook (não bloqueia)
+      syncAgendaWithWebhook();
+      
+      toast.success("Agenda atualizada!", { id: "refresh" });
+    } catch (error) {
+      toast.error("Erro ao atualizar", { id: "refresh" });
+    }
+  };
 
   // Funções de navegação
   const goToPreviousMonth = () => {
@@ -102,45 +187,78 @@ export default function Agenda() {
     return { daysInMonth, startingDayOfWeek };
   };
 
+  // Converter appointment do banco para formato local
+  const parseAppointment = (apt: any) => {
+    // Usar start_datetime se disponível, senão usar date+time (compatibilidade)
+    let date: Date;
+    let time: string;
+    
+    if (apt.start_datetime) {
+      // Extrair data/hora LITERAL do banco, sem conversão de timezone
+      const match = apt.start_datetime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (match) {
+        const [, year, month, day, hours, minutes] = match;
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
+        time = `${hours}:${minutes}`;
+      } else {
+        // Fallback
+        date = new Date(apt.start_datetime);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        time = `${hours}:${minutes}`;
+      }
+    } else {
+      // Fallback para dados antigos
+      const [hours, minutes] = apt.time.split(':');
+      date = new Date(apt.date);
+      date.setHours(parseInt(hours), parseInt(minutes));
+      time = apt.time;
+    }
+    
+    return {
+      id: apt.id,
+      date: date,
+      time: time,
+      patient: apt.patient_name,
+      type: apt.type,
+      status: apt.status as "confirmed" | "pending" | "completed"
+    };
+  };
+
   // Verificar se um dia tem compromissos
   const getAppointmentsForDay = (day: number) => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     
-    return mockAppointments.filter(apt => {
-      const aptDate = new Date(apt.date);
-      return aptDate.getFullYear() === year &&
-             aptDate.getMonth() === month &&
-             aptDate.getDate() === day;
-    }).sort((a, b) => a.date.getTime() - b.date.getTime());
+    return allAppointments
+      .map(parseAppointment)
+      .filter(apt => {
+        const aptDate = new Date(apt.date);
+        return aptDate.getFullYear() === year &&
+               aptDate.getMonth() === month &&
+               aptDate.getDate() === day;
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
   // Obter compromissos para uma data específica
   const getAppointmentsForDate = (date: Date) => {
-    return mockAppointments.filter(apt => {
-      const aptDate = new Date(apt.date);
-      return aptDate.toDateString() === date.toDateString();
-    }).sort((a, b) => a.date.getTime() - b.date.getTime());
+    return allAppointments
+      .map(parseAppointment)
+      .filter(apt => {
+        return apt.date.getFullYear() === date.getFullYear() &&
+               apt.date.getMonth() === date.getMonth() &&
+               apt.date.getDate() === date.getDate();
+      })
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
   // Obter compromissos em um horário específico
   const getAppointmentsForHour = (date: Date, hour: number) => {
-    return mockAppointments.filter(apt => {
+    return getAppointmentsForDate(date).filter(apt => {
       const aptDate = new Date(apt.date);
-      return aptDate.toDateString() === date.toDateString() &&
-             aptDate.getHours() === hour;
+      return aptDate.getHours() === hour;
     });
-  };
-
-  // Obter compromissos do mês
-  const getAppointmentsForMonth = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-
-    return mockAppointments.filter(apt => {
-      const aptDate = new Date(apt.date);
-      return aptDate.getFullYear() === year && aptDate.getMonth() === month;
-    }).sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth();
@@ -189,6 +307,168 @@ export default function Agenda() {
     return currentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   };
 
+  // Abrir modal de criação com data pré-preenchida
+  const handleOpenCreateModal = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setFormData({
+      start_date: todayStr,
+      start_time: "09:00",
+      end_date: todayStr,
+      end_time: "10:00",
+      patient_id: "",
+      patient_name: "",
+      type: "",
+      status: "pending",
+      observations: ""
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  // Selecionar paciente
+  const handleSelectPatient = (patientId: string) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (patient) {
+      setFormData(prev => ({
+        ...prev,
+        patient_id: patientId,
+        patient_name: patient.name
+      }));
+    }
+  };
+
+  // Criar compromisso
+  const handleCreateAppointment = async () => {
+    // Validação
+    if (!formData.start_date || !formData.start_time || !formData.end_date || !formData.end_time || !formData.patient_id || !formData.type) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    // Validar se data/hora fim é maior que início
+    const startDateTime = new Date(`${formData.start_date}T${formData.start_time}`);
+    const endDateTime = new Date(`${formData.end_date}T${formData.end_time}`);
+    
+    if (endDateTime <= startDateTime) {
+      toast.error("Data/hora de fim deve ser posterior ao início");
+      return;
+    }
+
+    try {
+      // Converter para ISO8601 - duas versões:
+      // 1. Para o banco (ajustado -3h para armazenar literal)
+      const startISOForDB = toSaoPauloISO(formData.start_date, formData.start_time);
+      const endISOForDB = toSaoPauloISO(formData.end_date, formData.end_time);
+      
+      // 2. Para o webhook (horário original)
+      const startISOForWebhook = `${formData.start_date}T${formData.start_time}:00-03:00`;
+      const endISOForWebhook = `${formData.end_date}T${formData.end_time}:00-03:00`;
+
+      console.log('🕐 Horários digitados:', {
+        start: `${formData.start_date} ${formData.start_time}`,
+        end: `${formData.end_date} ${formData.end_time}`
+      });
+      
+      console.log('🗄️ ISO8601 para banco (ajustado):', {
+        startISO: startISOForDB,
+        endISO: endISOForDB
+      });
+      
+      console.log('🌐 ISO8601 para webhook (original):', {
+        startISO: startISOForWebhook,
+        endISO: endISOForWebhook
+      });
+
+      // 1. Criar no banco de dados
+      const newAppointment = await createAppointment.mutateAsync({
+        date: formData.start_date,
+        time: formData.start_time,
+        start_datetime: startISOForDB,
+        end_datetime: endISOForDB,
+        patient_id: formData.patient_id,
+        patient_name: formData.patient_name,
+        type: formData.type,
+        status: formData.status,
+        observations: formData.observations || null
+      });
+
+      // 2. Enviar para webhook N8N
+      try {
+        const patient = patients.find(p => p.id === formData.patient_id);
+        
+        const webhookData = {
+          id: newAppointment.id,
+          start_datetime: startISOForWebhook,
+          end_datetime: endISOForWebhook,
+          patient_id: formData.patient_id,
+          patient_name: formData.patient_name,
+          patient_email: patient?.email || '',
+          patient_phone: patient?.phone || '',
+          type: formData.type,
+          status: formData.status,
+          observations: formData.observations || '',
+          created_at: new Date().toISOString()
+        };
+
+        await fetch('https://webhook.n8nlabz.com.br/webhook/labz-criar-agenda', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookData)
+        });
+
+        console.log('✅ Webhook disparado com sucesso');
+        console.log('📤 Payload:', webhookData);
+      } catch (webhookError) {
+        console.warn('⚠️ Erro ao disparar webhook (compromisso foi criado):', webhookError);
+      }
+
+      toast.success("Compromisso criado com sucesso!");
+      setIsCreateModalOpen(false);
+      
+      // Limpar formulário
+      setFormData({
+        start_date: "",
+        start_time: "",
+        end_date: "",
+        end_time: "",
+        patient_id: "",
+        patient_name: "",
+        type: "",
+        status: "pending",
+        observations: ""
+      });
+    } catch (error) {
+      console.error('Erro ao criar compromisso:', error);
+      toast.error("Erro ao criar compromisso");
+    }
+  };
+
+  // Sincronizar agenda quando carregar os dados
+  useEffect(() => {
+    const doSync = async () => {
+      if (!isLoading && allAppointments.length > 0 && patients.length > 0) {
+        // Pequeno delay para garantir que todos os dados carregaram
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await syncAgendaWithWebhook();
+      }
+    };
+    
+    doSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, allAppointments.length, patients.length]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando agenda...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 md:space-y-4 lg:space-y-5 p-4 md:p-6 lg:p-8 max-h-screen overflow-y-auto">
       {/* Header */}
@@ -201,13 +481,30 @@ export default function Agenda() {
             Gerencie sua agenda com precisão
           </p>
         </div>
-        <button 
-          onClick={goToToday}
-          className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-semibold text-accent-foreground transition-all hover:shadow-[0_0_40px_hsl(var(--accent)/0.4)] hover-scale w-full sm:w-auto"
-        >
-          <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" />
-          Ir para Hoje
+        <div className="flex gap-2">
+          <button 
+            onClick={goToToday}
+            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-semibold text-foreground transition-all hover:bg-secondary w-full sm:w-auto"
+          >
+            <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            Hoje
+          </button>
+          <button 
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-semibold text-foreground transition-all hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 md:h-4 md:w-4", isLoading && "animate-spin")} />
+            Atualizar
+          </button>
+          <button 
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-semibold text-accent-foreground transition-all hover:shadow-[0_0_40px_hsl(var(--accent)/0.4)] hover-scale w-full sm:w-auto"
+          >
+            <Plus className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            Novo Evento
         </button>
+        </div>
       </div>
 
       {/* View Controls */}
@@ -267,12 +564,9 @@ export default function Agenda() {
                       hour === new Date().getHours() && currentDate.toDateString() === today.toDateString() && "bg-accent/5"
                     )}
                   >
-                    {/* Hora */}
                     <div className="w-16 md:w-20 shrink-0 pr-3 py-2 text-xs md:text-sm text-muted-foreground font-medium">
                       {formatHour(hour)}
                     </div>
-                    
-                    {/* Eventos */}
                     <div className="flex-1 py-1 space-y-1">
                       {appointments.map((apt) => (
                         <div
@@ -288,8 +582,8 @@ export default function Agenda() {
                         >
                           <div className="font-semibold text-foreground">{apt.time} - {apt.patient}</div>
                           <div className="text-muted-foreground">{apt.type}</div>
-                        </div>
-                      ))}
+            </div>
+          ))}
                     </div>
                   </div>
                 );
@@ -304,7 +598,6 @@ export default function Agenda() {
         <div className="card-luxury p-3 md:p-4 lg:p-6 animate-fade-in-up overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
-              {/* Cabeçalho dos Dias */}
               <div className="grid grid-cols-[80px_repeat(7,1fr)] gap-2 mb-2 pb-2 border-b border-border">
                 <div></div>
                 {weekDays.map((day, i) => {
@@ -328,25 +621,21 @@ export default function Agenda() {
                 })}
               </div>
 
-              {/* Grade de Horários */}
               <div className="space-y-0">
                 {hours.map((hour) => (
                   <div key={hour} className="grid grid-cols-[80px_repeat(7,1fr)] gap-2 border-b border-border/20 min-h-[50px]">
-                    {/* Hora */}
                     <div className="text-xs text-muted-foreground font-medium py-1">
                       {formatHour(hour)}
                     </div>
-                    
-                    {/* Dias da Semana */}
                     {weekDays.map((day, i) => {
                       const appointments = getAppointmentsForHour(day, hour);
                       const isToday = day.toDateString() === today.toDateString();
                       const isCurrentHour = hour === new Date().getHours();
-                      
-                      return (
-                        <div
-                          key={i}
-                          className={cn(
+
+            return (
+              <div
+                key={i}
+                className={cn(
                             "py-0.5 px-1",
                             isToday && isCurrentHour && "bg-accent/5"
                           )}
@@ -376,26 +665,23 @@ export default function Agenda() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+                      </div>
+                    )}
 
       {/* MONTH VIEW - Calendário */}
       {viewMode === "month" && (
         <div className="card-luxury p-3 md:p-4 lg:p-6 animate-fade-in-up">
           <div className="grid grid-cols-7 gap-1.5 md:gap-2 lg:gap-3">
-            {/* Day Headers */}
             {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
               <div key={day} className="text-center pb-1 md:pb-2">
                 <span className="text-caption text-[9px] md:text-[10px] lg:text-xs">{day}</span>
               </div>
             ))}
 
-            {/* Empty cells before first day */}
             {Array.from({ length: startingDayOfWeek }).map((_, i) => (
               <div key={`empty-${i}`} className="h-10 sm:h-12 md:h-14 lg:h-16" />
             ))}
 
-            {/* Calendar Days */}
             {Array.from({ length: daysInMonth }, (_, i) => {
               const day = i + 1;
               const isToday = isCurrentMonth && day === today.getDate();
@@ -434,14 +720,14 @@ export default function Agenda() {
                       ))}
                       {dayAppointments.length > 3 && (
                         <span className="text-[6px] md:text-[8px] text-muted-foreground">+{dayAppointments.length - 3}</span>
-                      )}
-                    </div>
+                )}
+              </div>
                   )}
                 </button>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
+      </div>
       )}
 
       {/* Modal de Eventos do Dia */}
@@ -462,7 +748,7 @@ export default function Agenda() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+        <div className="space-y-3">
                 <p className="text-sm text-muted-foreground mb-3">
                   {selectedDayAppointments.length} {selectedDayAppointments.length === 1 ? "compromisso" : "compromissos"}
                 </p>
@@ -471,7 +757,6 @@ export default function Agenda() {
                     key={appointment.id}
                     className="rounded-lg border border-border/50 bg-background p-3 space-y-2"
                   >
-                    {/* Time */}
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-accent" />
                       <span className="text-sm font-semibold text-foreground">
@@ -491,23 +776,164 @@ export default function Agenda() {
                       </div>
                     </div>
 
-                    {/* Patient */}
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <div>
+                <div>
                         <p className="text-sm font-medium text-foreground">
                           {appointment.patient}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {appointment.type}
                         </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                </div>
               </div>
+            </div>
+          ))}
+        </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Criação de Evento */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-lg md:text-xl">
+              Novo Compromisso
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Data e Hora Início */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="start_date">Data Início *</Label>
+                <Input
+                  id="start_date"
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    start_date: e.target.value,
+                    end_date: e.target.value // Preencher data fim automaticamente
+                  }))}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="start_time">Hora Início *</Label>
+                <Input
+                  id="start_time"
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Data e Hora Fim */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="end_date">Data Fim *</Label>
+                <Input
+                  id="end_date"
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end_time">Hora Fim *</Label>
+                <Input
+                  id="end_time"
+                  type="time"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Paciente */}
+            <div className="space-y-2">
+              <Label htmlFor="patient">Paciente *</Label>
+              <Select value={formData.patient_id} onValueChange={handleSelectPatient}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map((patient) => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tipo */}
+            <div className="space-y-2">
+              <Label htmlFor="type">Tipo de Atendimento *</Label>
+              <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Consulta">Consulta</SelectItem>
+                  <SelectItem value="Retorno">Retorno</SelectItem>
+                  <SelectItem value="Tratamento">Tratamento</SelectItem>
+                  <SelectItem value="Avaliação">Avaliação</SelectItem>
+                  <SelectItem value="Exame">Exame</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status */}
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={formData.status} onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="completed">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Observações */}
+            <div className="space-y-2">
+              <Label htmlFor="observations">Observações</Label>
+              <Textarea
+                id="observations"
+                placeholder="Digite observações ou notas sobre o compromisso..."
+                value={formData.observations}
+                onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
+                className="min-h-[80px] resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional - Informações adicionais sobre o compromisso
+              </p>
+      </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCreateAppointment}
+              disabled={createAppointment.isPending}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              {createAppointment.isPending ? "Criando..." : "Criar Compromisso"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
