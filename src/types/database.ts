@@ -17,6 +17,7 @@ export interface Database {
           slug: string
           settings: Json
           is_active: boolean
+          logo_url: string | null
         }
         Insert: {
           id?: string
@@ -25,6 +26,7 @@ export interface Database {
           slug: string
           settings?: Json
           is_active?: boolean
+          logo_url?: string | null
         }
         Update: {
           id?: string
@@ -33,6 +35,7 @@ export interface Database {
           slug?: string
           settings?: Json
           is_active?: boolean
+          logo_url?: string | null
         }
       }
       profiles: {

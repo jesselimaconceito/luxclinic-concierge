@@ -7,6 +7,7 @@ export interface Organization {
   slug: string;
   settings: Record<string, any>;
   is_active: boolean;
+  logo_url: string | null;
 }
 
 export interface Profile {

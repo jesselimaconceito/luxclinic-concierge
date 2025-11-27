@@ -26,7 +26,7 @@ const navigation = [
   { name: "Agenda", href: "/app/agenda", icon: Calendar },
   { name: "CRM", href: "/app/crm", icon: Users },
   { name: "Subscription", href: "/app/subscription", icon: CreditCard },
-  { name: "Integrations", href: "/app/integrations", icon: Plug },
+  { name: "Integração", href: "/app/integrations", icon: Plug },
   { name: "Token Usage", href: "/app/tokens", icon: TrendingUp },
   { name: "KPIs", href: "/app/kpis", icon: BarChart3 },
 ];
@@ -49,9 +49,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo & Organization */}
       <div className="border-b border-border/50 px-4 md:px-6 py-4">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground">
-            Lux<span className="text-accent">Clinic</span>
-          </h1>
+          {/* Logo ou Nome */}
+          {organization?.logo_url ? (
+            <img
+              src={organization.logo_url}
+              alt={organization.name}
+              className="h-10 md:h-12 w-auto max-w-[160px] object-contain"
+            />
+          ) : (
+            <h1 className="font-display text-xl md:text-2xl font-bold tracking-tight text-foreground">
+              Lux<span className="text-accent">Clinic</span>
+            </h1>
+          )}
           <Button
             variant="ghost"
             size="icon"
