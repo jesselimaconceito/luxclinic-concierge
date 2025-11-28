@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Save, Upload, X } from "lucide-react";
+import { ArrowLeft, Save, Upload, X, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -423,6 +423,28 @@ export default function OrganizationForm() {
                   </p>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Workflow Section (only when editing) */}
+        {isEditing && (
+          <Card className="border-purple-800/30 bg-slate-900/40 backdrop-blur-xl">
+            <CardHeader>
+              <CardTitle className="text-purple-100">Automações e Workflows</CardTitle>
+              <CardDescription className="text-purple-400">
+                Configure fluxos de trabalho automatizados para esta organização
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                type="button"
+                onClick={() => navigate(`/super-admin/organizations/${id}/workflow`)}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+              >
+                <Workflow className="mr-2 h-4 w-4" />
+                Criar Workflow
+              </Button>
             </CardContent>
           </Card>
         )}

@@ -219,6 +219,53 @@ export interface Database {
           closing_message?: string
         }
       }
+      whatsapp_instances: {
+        Row: {
+          id: string
+          organization_id: string
+          created_at: string
+          updated_at: string
+          instance_id: string
+          token: string
+          instance_name: string
+          admin_field_01: string
+          phone: string
+          webhook_created: string | null
+          status: 'pending' | 'connected' | 'disconnected' | 'error'
+          qr_code: string | null
+          pairing_code: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          created_at?: string
+          updated_at?: string
+          instance_id: string
+          token: string
+          instance_name: string
+          admin_field_01: string
+          phone: string
+          webhook_created?: string | null
+          status?: 'pending' | 'connected' | 'disconnected' | 'error'
+          qr_code?: string | null
+          pairing_code?: string | null
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          created_at?: string
+          updated_at?: string
+          instance_id?: string
+          token?: string
+          instance_name?: string
+          admin_field_01?: string
+          phone?: string
+          webhook_created?: string | null
+          status?: 'pending' | 'connected' | 'disconnected' | 'error'
+          qr_code?: string | null
+          pairing_code?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
