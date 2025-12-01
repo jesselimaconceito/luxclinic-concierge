@@ -18,6 +18,8 @@ export interface Database {
           settings: Json
           is_active: boolean
           logo_url: string | null
+          subscription_plan: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
+          plan_features: Json
         }
         Insert: {
           id?: string
@@ -27,6 +29,8 @@ export interface Database {
           settings?: Json
           is_active?: boolean
           logo_url?: string | null
+          subscription_plan?: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
+          plan_features?: Json
         }
         Update: {
           id?: string
@@ -36,6 +40,8 @@ export interface Database {
           settings?: Json
           is_active?: boolean
           logo_url?: string | null
+          subscription_plan?: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
+          plan_features?: Json
         }
       }
       profiles: {
@@ -276,6 +282,229 @@ export interface Database {
           qr_code?: string | null
           pairing_code?: string | null
           webhook_url?: string | null
+        }
+      }
+      work_schedules: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          // Domingo
+          domingo_is_active: boolean
+          domingo_inicio_trabalho: string | null
+          domingo_fim_trabalho: string | null
+          domingo_inicio_almoco: string | null
+          domingo_fim_almoco: string | null
+          // Segunda
+          segunda_is_active: boolean
+          segunda_inicio_trabalho: string | null
+          segunda_fim_trabalho: string | null
+          segunda_inicio_almoco: string | null
+          segunda_fim_almoco: string | null
+          // Terça
+          terca_is_active: boolean
+          terca_inicio_trabalho: string | null
+          terca_fim_trabalho: string | null
+          terca_inicio_almoco: string | null
+          terca_fim_almoco: string | null
+          // Quarta
+          quarta_is_active: boolean
+          quarta_inicio_trabalho: string | null
+          quarta_fim_trabalho: string | null
+          quarta_inicio_almoco: string | null
+          quarta_fim_almoco: string | null
+          // Quinta
+          quinta_is_active: boolean
+          quinta_inicio_trabalho: string | null
+          quinta_fim_trabalho: string | null
+          quinta_inicio_almoco: string | null
+          quinta_fim_almoco: string | null
+          // Sexta
+          sexta_is_active: boolean
+          sexta_inicio_trabalho: string | null
+          sexta_fim_trabalho: string | null
+          sexta_inicio_almoco: string | null
+          sexta_fim_almoco: string | null
+          // Sábado
+          sabado_is_active: boolean
+          sabado_inicio_trabalho: string | null
+          sabado_fim_trabalho: string | null
+          sabado_inicio_almoco: string | null
+          sabado_fim_almoco: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          // Domingo
+          domingo_is_active?: boolean
+          domingo_inicio_trabalho?: string | null
+          domingo_fim_trabalho?: string | null
+          domingo_inicio_almoco?: string | null
+          domingo_fim_almoco?: string | null
+          // Segunda
+          segunda_is_active?: boolean
+          segunda_inicio_trabalho?: string | null
+          segunda_fim_trabalho?: string | null
+          segunda_inicio_almoco?: string | null
+          segunda_fim_almoco?: string | null
+          // Terça
+          terca_is_active?: boolean
+          terca_inicio_trabalho?: string | null
+          terca_fim_trabalho?: string | null
+          terca_inicio_almoco?: string | null
+          terca_fim_almoco?: string | null
+          // Quarta
+          quarta_is_active?: boolean
+          quarta_inicio_trabalho?: string | null
+          quarta_fim_trabalho?: string | null
+          quarta_inicio_almoco?: string | null
+          quarta_fim_almoco?: string | null
+          // Quinta
+          quinta_is_active?: boolean
+          quinta_inicio_trabalho?: string | null
+          quinta_fim_trabalho?: string | null
+          quinta_inicio_almoco?: string | null
+          quinta_fim_almoco?: string | null
+          // Sexta
+          sexta_is_active?: boolean
+          sexta_inicio_trabalho?: string | null
+          sexta_fim_trabalho?: string | null
+          sexta_inicio_almoco?: string | null
+          sexta_fim_almoco?: string | null
+          // Sábado
+          sabado_is_active?: boolean
+          sabado_inicio_trabalho?: string | null
+          sabado_fim_trabalho?: string | null
+          sabado_inicio_almoco?: string | null
+          sabado_fim_almoco?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          // Domingo
+          domingo_is_active?: boolean
+          domingo_inicio_trabalho?: string | null
+          domingo_fim_trabalho?: string | null
+          domingo_inicio_almoco?: string | null
+          domingo_fim_almoco?: string | null
+          // Segunda
+          segunda_is_active?: boolean
+          segunda_inicio_trabalho?: string | null
+          segunda_fim_trabalho?: string | null
+          segunda_inicio_almoco?: string | null
+          segunda_fim_almoco?: string | null
+          // Terça
+          terca_is_active?: boolean
+          terca_inicio_trabalho?: string | null
+          terca_fim_trabalho?: string | null
+          terca_inicio_almoco?: string | null
+          terca_fim_almoco?: string | null
+          // Quarta
+          quarta_is_active?: boolean
+          quarta_inicio_trabalho?: string | null
+          quarta_fim_trabalho?: string | null
+          quarta_inicio_almoco?: string | null
+          quarta_fim_almoco?: string | null
+          // Quinta
+          quinta_is_active?: boolean
+          quinta_inicio_trabalho?: string | null
+          quinta_fim_trabalho?: string | null
+          quinta_inicio_almoco?: string | null
+          quinta_fim_almoco?: string | null
+          // Sexta
+          sexta_is_active?: boolean
+          sexta_inicio_trabalho?: string | null
+          sexta_fim_trabalho?: string | null
+          sexta_inicio_almoco?: string | null
+          sexta_fim_almoco?: string | null
+          // Sábado
+          sabado_is_active?: boolean
+          sabado_inicio_trabalho?: string | null
+          sabado_fim_trabalho?: string | null
+          sabado_inicio_almoco?: string | null
+          sabado_fim_almoco?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      subscription_plan_configs: {
+        Row: {
+          id: string
+          plan_id: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
+          plan_name: string
+          plan_description: string | null
+          atendimento_inteligente: boolean
+          agendamento_automatico: boolean
+          lembretes_automaticos: boolean
+          confirmacao_email: boolean
+          base_conhecimento: boolean
+          relatorios_avancados: boolean
+          integracao_whatsapp: boolean
+          multi_usuarios: boolean
+          personalizacao_agente: boolean
+          analytics: boolean
+          max_agendamentos_mes: number | null
+          max_mensagens_whatsapp_mes: number | null
+          max_usuarios: number | null
+          max_pacientes: number | null
+          price_monthly: number | null
+          price_annual: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          plan_id: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
+          plan_name: string
+          plan_description?: string | null
+          atendimento_inteligente?: boolean
+          agendamento_automatico?: boolean
+          lembretes_automaticos?: boolean
+          confirmacao_email?: boolean
+          base_conhecimento?: boolean
+          relatorios_avancados?: boolean
+          integracao_whatsapp?: boolean
+          multi_usuarios?: boolean
+          personalizacao_agente?: boolean
+          analytics?: boolean
+          max_agendamentos_mes?: number | null
+          max_mensagens_whatsapp_mes?: number | null
+          max_usuarios?: number | null
+          max_pacientes?: number | null
+          price_monthly?: number | null
+          price_annual?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          plan_id?: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
+          plan_name?: string
+          plan_description?: string | null
+          atendimento_inteligente?: boolean
+          agendamento_automatico?: boolean
+          lembretes_automaticos?: boolean
+          confirmacao_email?: boolean
+          base_conhecimento?: boolean
+          relatorios_avancados?: boolean
+          integracao_whatsapp?: boolean
+          multi_usuarios?: boolean
+          personalizacao_agente?: boolean
+          analytics?: boolean
+          max_agendamentos_mes?: number | null
+          max_mensagens_whatsapp_mes?: number | null
+          max_usuarios?: number | null
+          max_pacientes?: number | null
+          price_monthly?: number | null
+          price_annual?: number | null
+          created_at?: string
+          updated_at?: string
         }
       }
     }

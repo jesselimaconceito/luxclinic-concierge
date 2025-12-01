@@ -15,14 +15,29 @@ import {
   ChevronRight,
   Kanban as KanbanIcon,
   Bot,
-  BookOpen
+  BookOpen,
+  Crown,
+  Check,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 const navigation = [
   { name: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
@@ -46,6 +61,54 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { theme, toggleTheme } = useTheme();
   const { profile, organization, signOut } = useAuth();
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [selectedPlanForRequest, setSelectedPlanForRequest] = useState<string | null>(null);
+
+  // Carregar planos disponíveis
+  const { data: plans = [] } = useQuery({
+    queryKey: ['subscription-plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscription_plan_configs')
+        .select('*')
+        .order('plan_id', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar plano atual da organização
+  const currentPlan = plans.find(p => p.plan_id === organization?.subscription_plan);
+
+  const getPlanBadgeColor = (planId: string) => {
+    switch (planId) {
+      case 'plano_a': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'plano_b': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+      case 'plano_c': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+      case 'plano_d': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+      default: return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
+    }
+  };
+
+  const handleRequestPlanChange = async () => {
+    if (!selectedPlanForRequest || !organization?.id) {
+      toast.error('Por favor, selecione um plano');
+      return;
+    }
+
+    try {
+      // Aqui você pode enviar email para o super admin, criar um ticket, etc
+      toast.success('Solicitação enviada! Entraremos em contato em breve.', {
+        description: `Plano solicitado: ${plans.find(p => p.plan_id === selectedPlanForRequest)?.plan_name}`,
+      });
+      setIsPlanModalOpen(false);
+      setSelectedPlanForRequest(null);
+    } catch (error) {
+      console.error('Erro ao solicitar mudança de plano:', error);
+      toast.error('Erro ao enviar solicitação');
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -189,7 +252,34 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/* User Profile */}
-      <div className="border-t border-border/50 p-3 md:p-4 space-y-2">
+      <div className="border-t border-border/50 p-3 md:p-4 space-y-3">
+        {/* Badge do Plano */}
+        {currentPlan && (
+          <div 
+            onClick={() => setIsPlanModalOpen(true)}
+            className={cn(
+              "rounded-lg border-2 p-3 cursor-pointer transition-all hover:border-accent hover:shadow-lg",
+              getPlanBadgeColor(currentPlan.plan_id).replace('bg-', 'border-').replace('/10', '/30')
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Crown className={cn(
+                  "h-4 w-4",
+                  currentPlan.plan_id === 'plano_a' && "text-blue-500",
+                  currentPlan.plan_id === 'plano_b' && "text-purple-500",
+                  currentPlan.plan_id === 'plano_c' && "text-amber-500",
+                  currentPlan.plan_id === 'plano_d' && "text-emerald-500"
+                )} />
+                <span className="text-xs font-semibold text-foreground">
+                  {currentPlan.plan_name}
+                </span>
+              </div>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 rounded-lg bg-secondary/50 px-3 md:px-4 py-2.5 md:py-3">
           <div className="flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-full bg-accent/20">
             <span className="font-display text-xs md:text-sm font-semibold text-accent">
@@ -215,6 +305,187 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           Sair
         </Button>
       </div>
+
+      {/* Modal de Planos */}
+      <Dialog open={isPlanModalOpen} onOpenChange={setIsPlanModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-accent" />
+              Alterar Plano de Assinatura
+            </DialogTitle>
+            <DialogDescription>
+              Seu plano atual: <strong>{currentPlan?.plan_name}</strong>. 
+              Selecione um novo plano para solicitar a alteração.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+            {plans.map((plan) => {
+              const isCurrentPlan = plan.plan_id === organization?.subscription_plan;
+              const isSelected = selectedPlanForRequest === plan.plan_id;
+              
+              return (
+                <div
+                  key={plan.plan_id}
+                  onClick={() => !isCurrentPlan && setSelectedPlanForRequest(plan.plan_id)}
+                  className={cn(
+                    "relative p-5 rounded-lg border-2 transition-all cursor-pointer",
+                    isCurrentPlan && "border-accent bg-accent/5 cursor-not-allowed opacity-75",
+                    isSelected && !isCurrentPlan && "border-accent bg-accent/5 ring-2 ring-accent",
+                    !isSelected && !isCurrentPlan && "border-border hover:border-accent/50"
+                  )}
+                >
+                  {/* Badge Plano Atual */}
+                  {isCurrentPlan && (
+                    <div className="absolute top-2 right-2">
+                      <Badge className="bg-accent text-accent-foreground">
+                        Plano Atual
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Checkmark quando selecionado */}
+                  {isSelected && !isCurrentPlan && (
+                    <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-accent flex items-center justify-center">
+                      <Check className="h-4 w-4 text-accent-foreground" />
+                    </div>
+                  )}
+
+                  {/* Nome e Preço */}
+                  <div className="mb-4">
+                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <Crown className={cn(
+                        "h-5 w-5",
+                        plan.plan_id === 'plano_a' && "text-blue-500",
+                        plan.plan_id === 'plano_b' && "text-purple-500",
+                        plan.plan_id === 'plano_c' && "text-amber-500",
+                        plan.plan_id === 'plano_d' && "text-emerald-500"
+                      )} />
+                      {plan.plan_name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {plan.plan_description}
+                    </p>
+                    <div className="mt-3">
+                      <span className="text-3xl font-bold text-foreground">
+                        R$ {plan.price_monthly?.toFixed(2)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">/mês</span>
+                    </div>
+                  </div>
+
+                  {/* Recursos */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase">
+                      Recursos:
+                    </p>
+                    <div className="space-y-1.5">
+                      {plan.atendimento_inteligente && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Atendimento Inteligente</span>
+                        </div>
+                      )}
+                      {plan.agendamento_automatico && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Agendamento Automático</span>
+                        </div>
+                      )}
+                      {plan.lembretes_automaticos && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Lembretes Automáticos</span>
+                        </div>
+                      )}
+                      {plan.confirmacao_email && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Confirmação por Email</span>
+                        </div>
+                      )}
+                      {plan.base_conhecimento && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Base de Conhecimento</span>
+                        </div>
+                      )}
+                      {plan.relatorios_avancados && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Relatórios Avançados</span>
+                        </div>
+                      )}
+                      {plan.integracao_whatsapp && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Integração WhatsApp</span>
+                        </div>
+                      )}
+                      {plan.multi_usuarios && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Múltiplos Usuários</span>
+                        </div>
+                      )}
+                      {plan.personalizacao_agente && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Personalização do Agente</span>
+                        </div>
+                      )}
+                      {plan.analytics && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span>Analytics</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Limites */}
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1.5">
+                        Limites:
+                      </p>
+                      <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                        <div>
+                          <span className="font-medium">Agendamentos:</span>{' '}
+                          {plan.max_agendamentos_mes || '∞'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Mensagens:</span>{' '}
+                          {plan.max_mensagens_whatsapp_mes || '∞'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Usuários:</span>{' '}
+                          {plan.max_usuarios || '∞'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Pacientes:</span>{' '}
+                          {plan.max_pacientes || '∞'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPlanModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRequestPlanChange}
+              disabled={!selectedPlanForRequest}
+            >
+              Solicitar Alteração
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

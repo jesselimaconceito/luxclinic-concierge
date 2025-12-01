@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Clock, User, Plus, RefreshCw } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Clock, User, Plus, RefreshCw, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOrganization } from "@/hooks/useOrganization";
 import {
@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -19,14 +20,48 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useAppointments, useCreateAppointment } from "@/hooks/useAppointments";
 import { usePatients } from "@/hooks/usePatients";
 import { toast } from "sonner";
 import { toSaoPauloISO } from "@/lib/dateUtils";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 type ViewMode = "day" | "week" | "month";
+
+interface DaySchedule {
+  inicio_trabalho: string;
+  fim_trabalho: string;
+  inicio_almoco: string;
+  fim_almoco: string;
+  is_active: boolean;
+}
+
+interface WorkSchedule {
+  id?: string;
+  domingo: DaySchedule;
+  segunda: DaySchedule;
+  terca: DaySchedule;
+  quarta: DaySchedule;
+  quinta: DaySchedule;
+  sexta: DaySchedule;
+  sabado: DaySchedule;
+}
+
+const diasDaSemana = [
+  { key: 'domingo', nome: "Domingo" },
+  { key: 'segunda', nome: "Segunda-feira" },
+  { key: 'terca', nome: "Terça-feira" },
+  { key: 'quarta', nome: "Quarta-feira" },
+  { key: 'quinta', nome: "Quinta-feira" },
+  { key: 'sexta', nome: "Sexta-feira" },
+  { key: 'sabado', nome: "Sábado" },
+] as const;
+
+type DayKey = typeof diasDaSemana[number]['key'];
 
 export default function Agenda() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -34,6 +69,9 @@ export default function Agenda() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isWorkScheduleModalOpen, setIsWorkScheduleModalOpen] = useState(false);
+  const [workSchedule, setWorkSchedule] = useState<WorkSchedule | null>(null);
+  const [isLoadingSchedules, setIsLoadingSchedules] = useState(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -54,8 +92,224 @@ export default function Agenda() {
   const createAppointment = useCreateAppointment();
   const queryClient = useQueryClient();
   const { organizationId } = useOrganization();
+  const { profile } = useAuth();
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  // Carregar horários de trabalho quando o modal abrir
+  useEffect(() => {
+    if (isWorkScheduleModalOpen) {
+      loadWorkSchedules();
+    }
+  }, [isWorkScheduleModalOpen, profile?.id, organizationId]);
+
+  const loadWorkSchedules = async () => {
+    if (!profile?.id || !organizationId) {
+      setIsLoadingSchedules(false);
+      return;
+    }
+
+    try {
+      setIsLoadingSchedules(true);
+      console.log('🔍 Carregando horários do banco...');
+      
+      const { data, error } = await supabase
+        .from('work_schedules')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('organization_id', organizationId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = não encontrado
+        throw error;
+      }
+
+      console.log('📊 Dados do banco:', data);
+
+      if (data) {
+        // ✅ TEM DADOS NO BANCO: Converter estrutura do banco para UI
+        const schedule: WorkSchedule = {
+          id: data.id,
+          domingo: {
+            is_active: data.domingo_is_active,
+            inicio_trabalho: data.domingo_inicio_trabalho || "08:00",
+            fim_trabalho: data.domingo_fim_trabalho || "18:00",
+            inicio_almoco: data.domingo_inicio_almoco || "12:00",
+            fim_almoco: data.domingo_fim_almoco || "13:00",
+          },
+          segunda: {
+            is_active: data.segunda_is_active,
+            inicio_trabalho: data.segunda_inicio_trabalho || "08:00",
+            fim_trabalho: data.segunda_fim_trabalho || "18:00",
+            inicio_almoco: data.segunda_inicio_almoco || "12:00",
+            fim_almoco: data.segunda_fim_almoco || "13:00",
+          },
+          terca: {
+            is_active: data.terca_is_active,
+            inicio_trabalho: data.terca_inicio_trabalho || "08:00",
+            fim_trabalho: data.terca_fim_trabalho || "18:00",
+            inicio_almoco: data.terca_inicio_almoco || "12:00",
+            fim_almoco: data.terca_fim_almoco || "13:00",
+          },
+          quarta: {
+            is_active: data.quarta_is_active,
+            inicio_trabalho: data.quarta_inicio_trabalho || "08:00",
+            fim_trabalho: data.quarta_fim_trabalho || "18:00",
+            inicio_almoco: data.quarta_inicio_almoco || "12:00",
+            fim_almoco: data.quarta_fim_almoco || "13:00",
+          },
+          quinta: {
+            is_active: data.quinta_is_active,
+            inicio_trabalho: data.quinta_inicio_trabalho || "08:00",
+            fim_trabalho: data.quinta_fim_trabalho || "18:00",
+            inicio_almoco: data.quinta_inicio_almoco || "12:00",
+            fim_almoco: data.quinta_fim_almoco || "13:00",
+          },
+          sexta: {
+            is_active: data.sexta_is_active,
+            inicio_trabalho: data.sexta_inicio_trabalho || "08:00",
+            fim_trabalho: data.sexta_fim_trabalho || "18:00",
+            inicio_almoco: data.sexta_inicio_almoco || "12:00",
+            fim_almoco: data.sexta_fim_almoco || "13:00",
+          },
+          sabado: {
+            is_active: data.sabado_is_active,
+            inicio_trabalho: data.sabado_inicio_trabalho || "08:00",
+            fim_trabalho: data.sabado_fim_trabalho || "18:00",
+            inicio_almoco: data.sabado_inicio_almoco || "12:00",
+            fim_almoco: data.sabado_fim_almoco || "13:00",
+          },
+        };
+        console.log('✅ Horários carregados do banco:', schedule);
+        setWorkSchedule(schedule);
+      } else {
+        // ❌ NÃO TEM DADOS NO BANCO: Criar horários padrão (segunda a sexta)
+        console.log('⚠️ Nenhum horário no banco, criando padrão...');
+        const defaultSchedule: WorkSchedule = {
+          domingo: { is_active: false, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+          segunda: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+          terca: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+          quarta: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+          quinta: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+          sexta: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+          sabado: { is_active: false, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        };
+        console.log('📝 Horários padrão criados:', defaultSchedule);
+        setWorkSchedule(defaultSchedule);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar horários:', error);
+      toast.error('Erro ao carregar horários de trabalho');
+      
+      // Em caso de erro, criar horários padrão
+      const defaultSchedule: WorkSchedule = {
+        domingo: { is_active: false, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        segunda: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        terca: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        quarta: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        quinta: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        sexta: { is_active: true, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+        sabado: { is_active: false, inicio_trabalho: "08:00", fim_trabalho: "18:00", inicio_almoco: "12:00", fim_almoco: "13:00" },
+      };
+      setWorkSchedule(defaultSchedule);
+    } finally {
+      setIsLoadingSchedules(false);
+    }
+  };
+
+  const saveWorkSchedules = async () => {
+    if (!profile?.id || !organizationId || !workSchedule) {
+      toast.error('Erro: usuário não identificado');
+      return;
+    }
+
+    try {
+      toast.loading('Salvando horários...', { id: 'save-schedules' });
+
+      // Converter estrutura da UI para banco
+      const dataToSave = {
+        organization_id: organizationId,
+        user_id: profile.id,
+        // Domingo
+        domingo_is_active: workSchedule.domingo.is_active,
+        domingo_inicio_trabalho: workSchedule.domingo.is_active ? workSchedule.domingo.inicio_trabalho : null,
+        domingo_fim_trabalho: workSchedule.domingo.is_active ? workSchedule.domingo.fim_trabalho : null,
+        domingo_inicio_almoco: workSchedule.domingo.is_active ? workSchedule.domingo.inicio_almoco : null,
+        domingo_fim_almoco: workSchedule.domingo.is_active ? workSchedule.domingo.fim_almoco : null,
+        // Segunda
+        segunda_is_active: workSchedule.segunda.is_active,
+        segunda_inicio_trabalho: workSchedule.segunda.is_active ? workSchedule.segunda.inicio_trabalho : null,
+        segunda_fim_trabalho: workSchedule.segunda.is_active ? workSchedule.segunda.fim_trabalho : null,
+        segunda_inicio_almoco: workSchedule.segunda.is_active ? workSchedule.segunda.inicio_almoco : null,
+        segunda_fim_almoco: workSchedule.segunda.is_active ? workSchedule.segunda.fim_almoco : null,
+        // Terça
+        terca_is_active: workSchedule.terca.is_active,
+        terca_inicio_trabalho: workSchedule.terca.is_active ? workSchedule.terca.inicio_trabalho : null,
+        terca_fim_trabalho: workSchedule.terca.is_active ? workSchedule.terca.fim_trabalho : null,
+        terca_inicio_almoco: workSchedule.terca.is_active ? workSchedule.terca.inicio_almoco : null,
+        terca_fim_almoco: workSchedule.terca.is_active ? workSchedule.terca.fim_almoco : null,
+        // Quarta
+        quarta_is_active: workSchedule.quarta.is_active,
+        quarta_inicio_trabalho: workSchedule.quarta.is_active ? workSchedule.quarta.inicio_trabalho : null,
+        quarta_fim_trabalho: workSchedule.quarta.is_active ? workSchedule.quarta.fim_trabalho : null,
+        quarta_inicio_almoco: workSchedule.quarta.is_active ? workSchedule.quarta.inicio_almoco : null,
+        quarta_fim_almoco: workSchedule.quarta.is_active ? workSchedule.quarta.fim_almoco : null,
+        // Quinta
+        quinta_is_active: workSchedule.quinta.is_active,
+        quinta_inicio_trabalho: workSchedule.quinta.is_active ? workSchedule.quinta.inicio_trabalho : null,
+        quinta_fim_trabalho: workSchedule.quinta.is_active ? workSchedule.quinta.fim_trabalho : null,
+        quinta_inicio_almoco: workSchedule.quinta.is_active ? workSchedule.quinta.inicio_almoco : null,
+        quinta_fim_almoco: workSchedule.quinta.is_active ? workSchedule.quinta.fim_almoco : null,
+        // Sexta
+        sexta_is_active: workSchedule.sexta.is_active,
+        sexta_inicio_trabalho: workSchedule.sexta.is_active ? workSchedule.sexta.inicio_trabalho : null,
+        sexta_fim_trabalho: workSchedule.sexta.is_active ? workSchedule.sexta.fim_trabalho : null,
+        sexta_inicio_almoco: workSchedule.sexta.is_active ? workSchedule.sexta.inicio_almoco : null,
+        sexta_fim_almoco: workSchedule.sexta.is_active ? workSchedule.sexta.fim_almoco : null,
+        // Sábado
+        sabado_is_active: workSchedule.sabado.is_active,
+        sabado_inicio_trabalho: workSchedule.sabado.is_active ? workSchedule.sabado.inicio_trabalho : null,
+        sabado_fim_trabalho: workSchedule.sabado.is_active ? workSchedule.sabado.fim_trabalho : null,
+        sabado_inicio_almoco: workSchedule.sabado.is_active ? workSchedule.sabado.inicio_almoco : null,
+        sabado_fim_almoco: workSchedule.sabado.is_active ? workSchedule.sabado.fim_almoco : null,
+      };
+
+      console.log('💾 Salvando no banco:', dataToSave);
+
+      // Upsert: insere se não existe, atualiza se existe
+      const { error } = await supabase
+        .from('work_schedules')
+        .upsert(dataToSave, {
+          onConflict: 'organization_id,user_id'
+        });
+
+      if (error) throw error;
+
+      toast.success('Horários salvos com sucesso!', { id: 'save-schedules' });
+      setIsWorkScheduleModalOpen(false);
+      loadWorkSchedules();
+    } catch (error) {
+      console.error('❌ Erro ao salvar horários:', error);
+      toast.error('Erro ao salvar horários', { id: 'save-schedules' });
+    }
+  };
+
+  const updateSchedule = (dayKey: DayKey, field: keyof DaySchedule, value: any) => {
+    console.log('🔄 Atualizando horário:', { dayKey, field, value });
+    setWorkSchedule(prev => {
+      if (!prev) return prev;
+      console.log('📋 Estado anterior:', prev);
+      const updated = {
+        ...prev,
+        [dayKey]: {
+          ...prev[dayKey],
+          [field]: value
+        }
+      };
+      console.log('📋 Estado atualizado:', updated);
+      return updated;
+    });
+  };
 
   // Função para sincronizar agenda com webhook
   const syncAgendaWithWebhook = async () => {
@@ -490,7 +744,7 @@ export default function Agenda() {
             Gerencie sua agenda com precisão
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button 
             onClick={goToToday}
             className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-semibold text-foreground transition-all hover:bg-secondary w-full sm:w-auto"
@@ -505,6 +759,13 @@ export default function Agenda() {
           >
             <RefreshCw className={cn("h-3.5 w-3.5 md:h-4 md:w-4", isLoading && "animate-spin")} />
             Atualizar
+          </button>
+          <button 
+            onClick={() => setIsWorkScheduleModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 md:px-5 py-2 md:py-2.5 text-xs md:text-sm font-semibold text-foreground transition-all hover:bg-secondary w-full sm:w-auto"
+          >
+            <Settings className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            Horários
           </button>
           <button 
             onClick={handleOpenCreateModal}
@@ -941,6 +1202,135 @@ export default function Agenda() {
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
               {createAppointment.isPending ? "Criando..." : "Criar Compromisso"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Configuração de Horários de Trabalho */}
+      <Dialog open={isWorkScheduleModalOpen} onOpenChange={setIsWorkScheduleModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-lg md:text-xl">
+              Horários de Trabalho
+            </DialogTitle>
+            <DialogDescription>
+              Configure seus horários de atendimento para cada dia da semana
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {isLoadingSchedules ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+              </div>
+            ) : workSchedule ? (
+              diasDaSemana.map((dia) => {
+                const daySchedule = workSchedule[dia.key];
+
+                return (
+                  <div key={dia.key} className="card-luxury p-4 space-y-3">
+                    {/* Header do Dia */}
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-base">{dia.nome}</h3>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`working-${dia.key}`} className="text-sm">
+                          Trabalho neste dia
+                        </Label>
+                        <Switch
+                          id={`working-${dia.key}`}
+                          checked={daySchedule.is_active}
+                          onCheckedChange={(checked) =>
+                            updateSchedule(dia.key, 'is_active', checked)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Campos de Horário (só aparecem se is_active = true) */}
+                    {daySchedule.is_active && (
+                      <div className="space-y-3 animate-fade-in">
+                        {/* Horário de Trabalho */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor={`inicio-${dia.key}`} className="text-sm">
+                              Início do Expediente *
+                            </Label>
+                            <Input
+                              id={`inicio-${dia.key}`}
+                              type="time"
+                              value={daySchedule.inicio_trabalho}
+                              onChange={(e) =>
+                                updateSchedule(dia.key, 'inicio_trabalho', e.target.value)
+                              }
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`fim-${dia.key}`} className="text-sm">
+                              Fim do Expediente *
+                            </Label>
+                            <Input
+                              id={`fim-${dia.key}`}
+                              type="time"
+                              value={daySchedule.fim_trabalho}
+                              onChange={(e) =>
+                                updateSchedule(dia.key, 'fim_trabalho', e.target.value)
+                              }
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Horário de Almoço */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor={`almoco-inicio-${dia.key}`} className="text-sm">
+                              Início do Almoço
+                            </Label>
+                            <Input
+                              id={`almoco-inicio-${dia.key}`}
+                              type="time"
+                              value={daySchedule.inicio_almoco}
+                              onChange={(e) =>
+                                updateSchedule(dia.key, 'inicio_almoco', e.target.value)
+                              }
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`almoco-fim-${dia.key}`} className="text-sm">
+                              Fim do Almoço
+                            </Label>
+                            <Input
+                              id={`almoco-fim-${dia.key}`}
+                              type="time"
+                              value={daySchedule.fim_almoco}
+                              onChange={(e) =>
+                                updateSchedule(dia.key, 'fim_almoco', e.target.value)
+                              }
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Erro ao carregar horários
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWorkScheduleModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveWorkSchedules} disabled={isLoadingSchedules}>
+              Salvar Horários
             </Button>
           </DialogFooter>
         </DialogContent>

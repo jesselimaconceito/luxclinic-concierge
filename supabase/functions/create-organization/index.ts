@@ -52,7 +52,8 @@ serve(async (req) => {
       adminEmail, 
       adminPassword, 
       adminFullName,
-      isActive = true 
+      isActive = true,
+      subscriptionPlan = 'plano_a'
     } = await req.json()
 
     console.log('📋 Criando organização:', organizationName)
@@ -94,6 +95,7 @@ serve(async (req) => {
         name: organizationName,
         slug,
         is_active: isActive,
+        subscription_plan: subscriptionPlan,
       })
       .select()
       .single()

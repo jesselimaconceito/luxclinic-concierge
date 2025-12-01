@@ -3,13 +3,38 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Save, Upload, X, Workflow, Sparkles, Loader2, MessageSquare, Check, XCircle, Clock } from "lucide-react";
+import { ArrowLeft, Save, Upload, X, Workflow, Sparkles, Loader2, MessageSquare, Check, XCircle, Clock, Users, UserPlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface OrganizationFormData {
   name: string;
@@ -17,6 +42,7 @@ interface OrganizationFormData {
   adminPassword: string;
   adminFullName: string;
   is_active: boolean;
+  subscription_plan: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d';
 }
 
 export default function OrganizationForm() {
@@ -30,6 +56,14 @@ export default function OrganizationForm() {
   const [openaiApiKey, setOpenaiApiKey] = useState<string>("");
   const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
   const [isConfiguringWebhook, setIsConfiguringWebhook] = useState(false);
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [newUserForm, setNewUserForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role: "doctor" as "admin" | "doctor" | "assistant",
+  });
 
   const {
     register,
@@ -41,10 +75,26 @@ export default function OrganizationForm() {
   } = useForm<OrganizationFormData>({
     defaultValues: {
       is_active: true,
+      subscription_plan: 'plano_a',
     },
   });
 
   const isActive = watch("is_active");
+  const subscriptionPlan = watch("subscription_plan");
+  
+  // Carregar planos disponíveis
+  const { data: plans = [] } = useQuery({
+    queryKey: ['subscription-plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscription_plan_configs')
+        .select('*')
+        .order('plan_id', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Upload de logo para Supabase Storage
   const uploadLogo = async (file: File, orgId: string): Promise<string> => {
@@ -290,6 +340,25 @@ export default function OrganizationForm() {
     enabled: isEditing,
   });
 
+  // Carregar usuários da organização
+  const { data: orgUsers = [], refetch: refetchUsers } = useQuery({
+    queryKey: ["org-users", id],
+    queryFn: async () => {
+      if (!id) return [];
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, role, is_active, created_at")
+        .eq("organization_id", id)
+        .eq("is_super_admin", false)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isEditing,
+  });
+
   // Buscar configuração do Agent IA (se editando)
   useEffect(() => {
     const loadAgentConfig = async () => {
@@ -364,6 +433,7 @@ export default function OrganizationForm() {
             name: data.name,
             is_active: data.is_active,
             logo_url: logoUrl,
+            subscription_plan: data.subscription_plan,
           })
           .eq('id', id);
 
@@ -426,6 +496,7 @@ export default function OrganizationForm() {
               adminPassword: data.adminPassword,
               adminFullName: data.adminFullName,
               isActive: data.is_active,
+              subscriptionPlan: data.subscription_plan,
             }),
           }
         );
@@ -450,6 +521,112 @@ export default function OrganizationForm() {
       toast.error(error.message || "Erro ao salvar organização");
     },
   });
+
+  // Adicionar usuário
+  const handleAddUser = async () => {
+    if (!newUserForm.full_name || !newUserForm.email || !newUserForm.password) {
+      toast.error("Preencha todos os campos");
+      return;
+    }
+
+    if (!id) {
+      toast.error("Organização não encontrada");
+      return;
+    }
+
+    try {
+      toast.loading("Criando usuário...", { id: "create-user" });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Não autenticado");
+      }
+
+      // Chamar Edge Function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-organization-users`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "create",
+            organizationId: id,
+            userData: {
+              fullName: newUserForm.full_name,
+              email: newUserForm.email,
+              password: newUserForm.password,
+              role: newUserForm.role,
+            },
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao criar usuário");
+      }
+
+      toast.success("Usuário criado com sucesso!", { id: "create-user" });
+      setIsAddUserModalOpen(false);
+      setNewUserForm({
+        full_name: "",
+        email: "",
+        password: "",
+        role: "doctor",
+      });
+      refetchUsers();
+    } catch (error: any) {
+      console.error("Erro ao criar usuário:", error);
+      toast.error(error.message || "Erro ao criar usuário", { id: "create-user" });
+    }
+  };
+
+  // Deletar usuário
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      toast.loading("Deletando usuário...", { id: "delete-user" });
+
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Não autenticado");
+      }
+
+      // Chamar Edge Function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-organization-users`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: "delete",
+            userId: userId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao deletar usuário");
+      }
+
+      toast.success("Usuário deletado com sucesso!", { id: "delete-user" });
+      setUserToDelete(null);
+      refetchUsers();
+    } catch (error: any) {
+      console.error("Erro ao deletar usuário:", error);
+      toast.error(error.message || "Erro ao deletar usuário", { id: "delete-user" });
+    }
+  };
 
   const onSubmit = (data: OrganizationFormData) => {
     saveMutation.mutate(data);
@@ -502,6 +679,130 @@ export default function OrganizationForm() {
               />
               {errors.name && (
                 <p className="text-xs text-red-400 mt-1">{errors.name.message}</p>
+              )}
+            </div>
+
+            {/* Plano de Assinatura */}
+            <div className="space-y-2">
+              <Label htmlFor="subscription_plan" className="text-purple-200">
+                Plano de Assinatura *
+              </Label>
+              <select
+                id="subscription_plan"
+                {...register("subscription_plan", { required: "Plano é obrigatório" })}
+                className="w-full h-10 px-3 rounded-md bg-slate-800/40 border border-purple-800/30 text-purple-100 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              >
+                {plans.map((plan) => (
+                  <option key={plan.plan_id} value={plan.plan_id}>
+                    {plan.plan_name} - R$ {plan.price_monthly?.toFixed(2)}/mês
+                  </option>
+                ))}
+              </select>
+              {errors.subscription_plan && (
+                <p className="text-xs text-red-400 mt-1">{errors.subscription_plan.message}</p>
+              )}
+              
+              {/* Descrição do Plano Selecionado */}
+              {subscriptionPlan && plans.find(p => p.plan_id === subscriptionPlan) && (
+                <div className="mt-3 p-4 rounded-lg bg-purple-900/20 border border-purple-800/30">
+                  <p className="text-sm text-purple-200 mb-3">
+                    {plans.find(p => p.plan_id === subscriptionPlan)?.plan_description}
+                  </p>
+                  
+                  {/* Recursos do Plano */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-purple-300 uppercase tracking-wide">
+                      Recursos Inclusos:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.atendimento_inteligente && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Atendimento Inteligente</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.agendamento_automatico && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Agendamento Automático</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.lembretes_automaticos && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Lembretes Automáticos</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.confirmacao_email && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Confirmação por Email</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.base_conhecimento && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Base de Conhecimento</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.relatorios_avancados && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Relatórios Avançados</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.integracao_whatsapp && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Integração WhatsApp</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.multi_usuarios && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Múltiplos Usuários</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.personalizacao_agente && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Personalização do Agente</span>
+                        </div>
+                      )}
+                      {plans.find(p => p.plan_id === subscriptionPlan)?.analytics && (
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <Check className="h-3 w-3 text-green-400" />
+                          <span>Analytics</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Limites do Plano */}
+                    <div className="mt-3 pt-3 border-t border-purple-800/30">
+                      <p className="text-xs font-semibold text-purple-300 uppercase tracking-wide mb-2">
+                        Limites:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-purple-300">
+                        <div>
+                          <span className="font-medium">Agendamentos/mês:</span>{' '}
+                          {plans.find(p => p.plan_id === subscriptionPlan)?.max_agendamentos_mes || 'Ilimitado'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Mensagens/mês:</span>{' '}
+                          {plans.find(p => p.plan_id === subscriptionPlan)?.max_mensagens_whatsapp_mes || 'Ilimitado'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Usuários:</span>{' '}
+                          {plans.find(p => p.plan_id === subscriptionPlan)?.max_usuarios || 'Ilimitado'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Pacientes:</span>{' '}
+                          {plans.find(p => p.plan_id === subscriptionPlan)?.max_pacientes || 'Ilimitado'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -881,6 +1182,87 @@ export default function OrganizationForm() {
           </Card>
         )}
 
+        {/* Usuários da Organização (only when editing) */}
+        {isEditing && (
+          <Card className="border-purple-800/30 bg-slate-900/40 backdrop-blur-xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-purple-100 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-purple-400" />
+                    Usuários da Organização
+                  </CardTitle>
+                  <CardDescription className="text-purple-400">
+                    Gerencie os usuários que têm acesso a esta organização
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => setIsAddUserModalOpen(true)}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Adicionar Usuário
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {orgUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+                  <p className="text-purple-300 text-sm">
+                    Nenhum usuário cadastrado
+                  </p>
+                  <p className="text-purple-500 text-xs mt-1">
+                    Adicione usuários para que possam acessar o sistema
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {orgUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-4 bg-slate-800/40 border border-purple-800/30 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-600/20">
+                          <span className="font-semibold text-purple-300">
+                            {user.full_name?.charAt(0).toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-purple-100">
+                            {user.full_name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-purple-400 capitalize">
+                              {user.role === 'admin' ? 'Administrador' : 
+                               user.role === 'doctor' ? 'Médico' : 'Assistente'}
+                            </span>
+                            <span className="text-purple-600">•</span>
+                            <span className={`text-xs ${user.is_active ? 'text-green-400' : 'text-red-400'}`}>
+                              {user.is_active ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUserToDelete(user.id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Actions */}
         <div className="flex justify-end gap-3">
           <Button
@@ -907,6 +1289,103 @@ export default function OrganizationForm() {
           </Button>
         </div>
       </form>
+
+      {/* Modal Adicionar Usuário */}
+      <Dialog open={isAddUserModalOpen} onOpenChange={setIsAddUserModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Crie um novo usuário para acessar esta organização
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="user_full_name">Nome Completo *</Label>
+              <Input
+                id="user_full_name"
+                placeholder="Ex: Dr. João Silva"
+                value={newUserForm.full_name}
+                onChange={(e) => setNewUserForm({ ...newUserForm, full_name: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="user_email">Email *</Label>
+              <Input
+                id="user_email"
+                type="email"
+                placeholder="usuario@email.com"
+                value={newUserForm.email}
+                onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="user_password">Senha *</Label>
+              <Input
+                id="user_password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={newUserForm.password}
+                onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="user_role">Função *</Label>
+              <Select
+                value={newUserForm.role}
+                onValueChange={(value: any) => setNewUserForm({ ...newUserForm, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="doctor">Médico</SelectItem>
+                  <SelectItem value="assistant">Assistente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddUserModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleAddUser}>
+              Criar Usuário
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog Deletar Usuário */}
+      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deletar Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja deletar este usuário? Esta ação não pode ser desfeita.
+              O usuário perderá acesso ao sistema imediatamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => userToDelete && handleDeleteUser(userToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Deletar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
