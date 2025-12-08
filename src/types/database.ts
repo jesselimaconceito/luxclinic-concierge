@@ -18,6 +18,7 @@ export interface Database {
           settings: Json
           is_active: boolean
           logo_url: string | null
+          contact_email: string | null
           subscription_plan: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
           plan_features: Json
         }
@@ -29,6 +30,7 @@ export interface Database {
           settings?: Json
           is_active?: boolean
           logo_url?: string | null
+          contact_email?: string | null
           subscription_plan?: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
           plan_features?: Json
         }
@@ -40,6 +42,7 @@ export interface Database {
           settings?: Json
           is_active?: boolean
           logo_url?: string | null
+          contact_email?: string | null
           subscription_plan?: 'plano_a' | 'plano_b' | 'plano_c' | 'plano_d'
           plan_features?: Json
         }

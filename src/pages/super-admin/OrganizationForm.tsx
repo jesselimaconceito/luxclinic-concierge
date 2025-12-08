@@ -38,6 +38,7 @@ import {
 
 interface OrganizationFormData {
   name: string;
+  contact_email: string;
   adminEmail: string;
   adminPassword: string;
   adminFullName: string;
@@ -390,7 +391,9 @@ export default function OrganizationForm() {
     if (organization) {
       reset({
         name: organization.name,
+        contact_email: organization.contact_email || "",
         is_active: organization.is_active,
+        subscription_plan: organization.subscription_plan,
         adminEmail: "",
         adminPassword: "",
         adminFullName: "",
@@ -442,6 +445,7 @@ export default function OrganizationForm() {
           .from('organizations')
           .update({
             name: data.name,
+            contact_email: data.contact_email || null,
             is_active: data.is_active,
             logo_url: logoUrl,
             subscription_plan: data.subscription_plan,
@@ -713,6 +717,22 @@ export default function OrganizationForm() {
               {errors.name && (
                 <p className="text-xs text-red-400 mt-1">{errors.name.message}</p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="contact_email" className="text-purple-200">
+                E-mail de Contato
+              </Label>
+              <Input
+                id="contact_email"
+                type="email"
+                {...register("contact_email")}
+                placeholder="contato@clinica.com"
+                className="mt-1.5 bg-slate-800/40 border-purple-800/30 text-purple-100 placeholder:text-purple-400/50"
+              />
+              <p className="text-xs text-purple-400 mt-1">
+                E-mail usado para envio de confirmações de agendamento
+              </p>
             </div>
 
             {/* Plano de Assinatura */}
