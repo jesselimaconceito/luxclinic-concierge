@@ -382,6 +382,17 @@ export default function OrganizationForm() {
       console.log("🔍 Iniciando saveMutation...");
       console.log("🔍 isEditing:", isEditing);
       
+      // Tentar refresh da sessão primeiro
+      console.log("🔄 Tentando refresh da sessão...");
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.warn("⚠️ Erro ao fazer refresh:", refreshError);
+      } else {
+        console.log("✅ Sessão refreshed com sucesso");
+      }
+      
+      // Pegar sessão atual (já refreshed ou a existente)
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       console.log("🔍 Session completa:", JSON.stringify(session, null, 2));
@@ -393,7 +404,11 @@ export default function OrganizationForm() {
       
       if (sessionError || !session || !session.access_token) {
         console.error("❌ Erro ao obter sessão:", sessionError);
-        throw new Error("Sessão expirada. Por favor, faça logout e login novamente.");
+        toast.error("Sessão expirada. Redirecionando para login...");
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1500);
+        throw new Error("Sessão expirada. Por favor, faça login novamente.");
       }
 
       let logoUrl = currentLogoUrl;

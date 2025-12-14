@@ -113,7 +113,7 @@ export interface Database {
           status: 'active' | 'inactive'
           last_visit: string | null
           total_visits: number
-          kanban_status: 'novo_contato' | 'qualificado' | 'em_atendimento' | 'agendado' | 'aguardando_confirmacao' | 'concluido'
+          kanban_status: 'novo_contato' | 'qualificado' | 'em_atendimento' | 'agendado' | 'aguardando_confirmacao' | 'concluido' | 'consulta_cancelado'
           observations: string | null
           resumo: string | null
         }

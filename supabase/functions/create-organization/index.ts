@@ -43,15 +43,23 @@ serve(async (req) => {
     
     console.log('👤 Resultado getUser - user:', user?.id);
     console.log('👤 Resultado getUser - error:', userError);
+    console.log('👤 User completo:', JSON.stringify(user, null, 2));
     
     if (userError) {
       console.error('❌ Erro ao verificar usuário:', userError);
-      throw new Error('Não autenticado: ' + userError.message)
+      console.error('❌ UserError completo:', JSON.stringify(userError, null, 2));
+      
+      // Mensagem mais específica
+      if (userError.message?.includes('session')) {
+        throw new Error('Sessão expirada. Por favor, faça logout e login novamente.')
+      }
+      
+      throw new Error('Erro de autenticação: ' + userError.message)
     }
     
     if (!user) {
       console.error('❌ Usuário não encontrado no token');
-      throw new Error('Não autenticado')
+      throw new Error('Token inválido. Por favor, faça logout e login novamente.')
     }
 
     console.log('✅ Usuário autenticado:', user.id);
