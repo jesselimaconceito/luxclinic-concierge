@@ -175,3 +175,4 @@ export function useChatMetrics() {
     staleTime: 30000, // Cache por 30 segundos
   });
 }
+

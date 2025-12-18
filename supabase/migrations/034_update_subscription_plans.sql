@@ -115,3 +115,4 @@ INSERT INTO subscription_plan_configs (
     NULL,   -- price_monthly (sob consulta)
     NULL    -- price_annual (sob consulta)
   );
+
