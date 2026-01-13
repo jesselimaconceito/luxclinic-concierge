@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Components
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -39,6 +39,75 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+/**
+ * 🔒 Gate global de autenticação
+ * Bloqueia TODAS as rotas até o auth estar pronto
+ */
+function AppRoutes() {
+  const { isReady } = useAuth();
+
+  if (!isReady) {
+    return (
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
+        Carregando...
+      </div>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Rotas públicas de autenticação */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* Rotas do Super Admin */}
+        <Route
+          element={
+            <SuperAdminRoute>
+              <SuperAdminLayout />
+            </SuperAdminRoute>
+          }
+        >
+          <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+          <Route path="/super-admin/organizations" element={<Organizations />} />
+          <Route path="/super-admin/organizations/new" element={<OrganizationForm />} />
+          <Route path="/super-admin/organizations/:id/edit" element={<OrganizationForm />} />
+          <Route path="/super-admin/plans" element={<Plans />} />
+          <Route path="/super-admin/token-usage" element={<TokenUsage />} />
+          <Route path="/super-admin/settings" element={<SuperAdminSettings />} />
+        </Route>
+
+        {/* Rotas de Organização */}
+        <Route
+          element={
+            <OrgRoute>
+              <Layout />
+            </OrgRoute>
+          }
+        >
+          <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
+          <Route path="/app/dashboard" element={<Dashboard />} />
+          <Route path="/app/agenda" element={<Agenda />} />
+          <Route path="/app/clientes/crm" element={<CRM />} />
+          <Route path="/app/clientes/kanban" element={<Kanban />} />
+          <Route path="/app/agent-ia" element={<AgentIA />} />
+          <Route path="/app/conhecimento" element={<Conhecimento />} />
+          <Route path="/app/integrations" element={<Integrations />} />
+
+          {/* Redirects antigos */}
+          <Route path="/app/crm" element={<Navigate to="/app/clientes/crm" replace />} />
+          <Route path="/app/crm/kanban" element={<Navigate to="/app/clientes/kanban" replace />} />
+        </Route>
+
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -46,43 +115,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Rotas públicas de autenticação */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-
-              {/* Rotas do Super Admin */}
-              <Route element={<SuperAdminRoute><SuperAdminLayout /></SuperAdminRoute>}>
-                <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
-                <Route path="/super-admin/organizations" element={<Organizations />} />
-                <Route path="/super-admin/organizations/new" element={<OrganizationForm />} />
-                <Route path="/super-admin/organizations/:id/edit" element={<OrganizationForm />} />
-                <Route path="/super-admin/plans" element={<Plans />} />
-                <Route path="/super-admin/token-usage" element={<TokenUsage />} />
-                <Route path="/super-admin/settings" element={<SuperAdminSettings />} />
-              </Route>
-
-              {/* Rotas de Organização (antiga "/" agora "/app/*") */}
-              <Route element={<OrgRoute><Layout /></OrgRoute>}>
-                <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
-                <Route path="/app/dashboard" element={<Dashboard />} />
-                <Route path="/app/agenda" element={<Agenda />} />
-                <Route path="/app/clientes/crm" element={<CRM />} />
-                <Route path="/app/clientes/kanban" element={<Kanban />} />
-                <Route path="/app/agent-ia" element={<AgentIA />} />
-                <Route path="/app/conhecimento" element={<Conhecimento />} />
-                {/* Redirect antigos */}
-                <Route path="/app/crm" element={<Navigate to="/app/clientes/crm" replace />} />
-                <Route path="/app/crm/kanban" element={<Navigate to="/app/clientes/kanban" replace />} />
-                <Route path="/app/integrations" element={<Integrations />} />
-              </Route>
-
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+          <AppRoutes />
         </TooltipProvider>
       </AuthProvider>
     </ThemeProvider>
