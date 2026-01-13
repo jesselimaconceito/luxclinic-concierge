@@ -15,7 +15,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Carregar dados do perfil e organização
   const loadUserData = async (userId: string) => {
     try {
-      // Buscar profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -25,7 +24,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileError) throw profileError;
       setProfile(profileData);
 
-      // Buscar organization (apenas se não for super admin)
       if (profileData?.organization_id && !profileData?.is_super_admin) {
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
@@ -35,8 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (orgError) throw orgError;
         setOrganization(orgData);
-      } else if (profileData?.is_super_admin) {
-        // Super admins não têm organização
+      } else {
         setOrganization(null);
       }
     } catch (error) {
@@ -46,38 +43,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Verificar sessão inicial
+  // Sessão inicial + listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserData(session.user.id);
-      }
-      setLoading(false);
-    });
+    let mounted = true;
 
-    // Listener para mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const initAuth = async () => {
+      setLoading(true);
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
       if (session?.user) {
-        loadUserData(session.user.id);
+        setUser(session.user);
+        await loadUserData(session.user.id);
       } else {
+        setUser(null);
         setProfile(null);
         setOrganization(null);
       }
-    });
 
-    return () => subscription.unsubscribe();
+      setLoading(false);
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setLoading(true);
+
+        if (session?.user) {
+          setUser(session.user);
+          await loadUserData(session.user.id);
+        } else {
+          setUser(null);
+          setProfile(null);
+          setOrganization(null);
+        }
+
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Login
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success('Login realizado com sucesso!');
     } catch (error: any) {
@@ -90,7 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Cadastro
   const signUp = async ({ email, password, fullName, organizationName }: SignUpData) => {
     try {
-      // 1. Criar usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -99,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authError) throw authError;
       if (!authData.user) throw new Error('Erro ao criar usuário');
 
-      // 2. Gerar slug da organização
       const slug = organizationName
         .toLowerCase()
         .normalize('NFD')
@@ -109,12 +124,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .replace(/-+/g, '-')
         .trim();
 
-      // 3. Criar organização
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name: organizationName,
-          slug: slug + '-' + Date.now(), // Adicionar timestamp para unicidade
+          slug: `${slug}-${Date.now()}`,
           settings: {},
         })
         .select()
@@ -122,19 +136,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (orgError) throw orgError;
 
-      // 4. Criar perfil do usuário
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: authData.user.id,
           organization_id: orgData.id,
           full_name: fullName,
-          role: 'admin', // Primeiro usuário é admin
+          role: 'admin',
         });
 
       if (profileError) throw profileError;
 
-      // 5. Criar settings padrão para a organização
       const { error: settingsError } = await supabase
         .from('settings')
         .insert({
@@ -158,28 +170,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      
-      // Limpar estado local independente do erro
+
       setUser(null);
       setProfile(null);
       setOrganization(null);
-      
-      // Se não for erro de sessão, mostrar erro
+
       if (error && error.message !== 'Auth session missing!') {
-        console.error('Erro no logout:', error);
         toast.error(error.message || 'Erro ao fazer logout');
       } else {
         toast.success('Logout realizado com sucesso!');
       }
     } catch (error: any) {
-      // Limpar estado mesmo com erro
       setUser(null);
       setProfile(null);
       setOrganization(null);
-      
-      console.error('Erro no logout:', error);
-      
-      // Só mostrar erro se não for sessão ausente
+
       if (error.message !== 'Auth session missing!') {
         toast.error('Erro ao fazer logout');
       } else {
@@ -188,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Reset de senha
+  // Reset senha
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -221,9 +226,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }
+
 
