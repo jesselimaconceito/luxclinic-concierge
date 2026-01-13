@@ -12,7 +12,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Carregar dados do perfil e organização
+  // -----------------------------
+  // Carregar dados do usuário
+  // -----------------------------
   const loadUserData = async (userId: string) => {
     try {
       const { data: profileData, error: profileError } = await supabase
@@ -43,7 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Sessão inicial + listener
+  // -----------------------------
+  // Inicialização da sessão
+  // -----------------------------
   useEffect(() => {
     let mounted = true;
 
@@ -91,7 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Login
+  // -----------------------------
+  // Auth helpers
+  // -----------------------------
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -104,7 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Cadastro
   const signUp = async ({ email, password, fullName, organizationName }: SignUpData) => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -166,34 +171,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Logout
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-
+      await supabase.auth.signOut();
+    } finally {
       setUser(null);
       setProfile(null);
       setOrganization(null);
-
-      if (error && error.message !== 'Auth session missing!') {
-        toast.error(error.message || 'Erro ao fazer logout');
-      } else {
-        toast.success('Logout realizado com sucesso!');
-      }
-    } catch (error: any) {
-      setUser(null);
-      setProfile(null);
-      setOrganization(null);
-
-      if (error.message !== 'Auth session missing!') {
-        toast.error('Erro ao fazer logout');
-      } else {
-        toast.success('Logout realizado com sucesso!');
-      }
+      toast.success('Logout realizado com sucesso!');
     }
   };
 
-  // Reset senha
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -209,12 +197,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // -----------------------------
+  // Estados derivados (CHAVE)
+  // -----------------------------
+  const isAuthenticated = !!user;
+  const isReady = !loading && (user === null || profile !== null);
+
   const value: AuthContextType = {
     user,
     profile,
     organization,
     isSuperAdmin: profile?.is_super_admin ?? false,
     loading,
+    isAuthenticated,
+    isReady,
     signIn,
     signUp,
     signOut,
@@ -231,5 +227,6 @@ export function useAuth() {
   }
   return context;
 }
+
 
 
